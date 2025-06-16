@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Transkrip ke SQL Query Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #4facfe;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: linear-gradient(135deg, #f8fcff 0%, #f0f8ff 100%);
+        }
+        
+        .upload-area:hover {
+            border-color: #00f2fe;
+            background: linear-gradient(135deg, #f0f8ff 0%, #e8f4ff 100%);
+            transform: translateY(-2px);
+        }
+        
+        .upload-area.dragover {
+            border-color: #00f2fe;
+            background: linear-gradient(135deg, #e8f4ff 0%, #d0e8ff 100%);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            color: #4facfe;
+            margin-bottom: 20px;
+        }
+        
+        .upload-text {
+            font-size: 1.2rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .upload-subtext {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 5px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            box-shadow: 0 2px 10px rgba(79, 172, 254, 0.3);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .copy-btn {
+            position: relative;
+            float: right;
+            margin-bottom: 10px;
+            background: #28a745;
+            font-size: 0.8rem;
+            padding: 8px 16px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-card {
+            background: linear-gradient(135deg, #f8fcff 0%, #f0f8ff 100%);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4facfe;
+        }
+        
+        .info-card h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-card p {
+            color: #666;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #e74c3c;
+            margin: 20px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 PDF to SQL Converter</h1>
+            <p>Konversi transkrip akademik PDF ke query SQL secara otomatis</p>
+        </div>
+        
+        <div class="content">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📤</div>
+                <div class="upload-text">Klik atau drag & drop file PDF transkrip</div>
+                <div class="upload-subtext">Format yang didukung: PDF</div>
+                <input type="file" id="fileInput" accept=".pdf">
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Memproses file PDF...</p>
+            </div>
+            
+            <div id="error" class="error" style="display: none;"></div>
+            
+            <div class="results" id="results">
+                <div class="info-grid" id="infoGrid"></div>
+                
+                <div class="tabs">
+                    <div class="tab active" data-tab="sql">SQL Query</div>
+                    <div class="tab" data-tab="preview">Preview Data</div>
+                </div>
+                
+                <div class="tab-content active" id="sql-content">
+                    <button class="copy-btn" onclick="copySQLToClipboard()">📋 Copy SQL</button>
+                    <div class="code-block" id="sqlOutput"></div>
+                </div>
+                
+                <div class="tab-content" id="preview-content">
+                    <div id="dataPreview"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let extractedData = null;
+        
+        // Setup drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(tabName + '-content').classList.add('active');
+            });
+        });
+        
+        async function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                showError('File harus berformat PDF');
+                return;
+            }
+            
+            showLoading(true);
+            hideError();
+            
+            try {
+                const text = await extractTextFromPDF(file);
+                extractedData = parseTranscript(text);
+                generateSQL(extractedData);
+                showResults();
+            } catch (error) {
+                showError('Error memproses file: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function extractTextFromPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = '';
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+            
+            return fullText;
+        }
+        
+        function parseTranscript(text) {
+            const data = {
+                nrp: '',
+                nama: '',
+                sksTotal: 0,
+                sksLulus: 0,
+                ipk: 0,
+                tahapPersiapan: {
+                    matakuliah: [],
+                    totalSks: 0,
+                    ip: 0
+                },
+                tahapSarjana: {
+                    matakuliah: [],
+                    totalSks: 0,
+                    ip: 0
+                }
+            };
+            
+            // Extract NRP dan Nama
+            const nrpNamaMatch = text.match(/NRP\s*\/\s*Nama\s+(\d+)\s*\/\s*(.+?)(?=SKS|$)/i);
+            if (nrpNamaMatch) {
+                data.nrp = nrpNamaMatch[1].trim();
+                data.nama = nrpNamaMatch[2].trim();
+            }
+            
+            // Extract SKS Tempuh dan Lulus
+            const sksMatch = text.match(/SKS\s+Tempuh\s*\/\s*SKS\s+Lulus\s+(\d+)\s*\/\s*(\d+)/i);
+            if (sksMatch) {
+                data.sksTotal = parseInt(sksMatch[1]);
+                data.sksLulus = parseInt(sksMatch[2]);
+            }
+            
+            // Extract IPK
+            const ipkMatch = text.match(/IPK\s+([0-9.]+)/i);
+            if (ipkMatch) {
+                data.ipk = parseFloat(ipkMatch[1]);
+            }
+            
+            // Parse mata kuliah per tahap
+            const tahapPersiapanSection = text.match(/---\s*Tahap:\s*Persiapan\s*---(.*?)(?=---\s*Tahap:\s*Sarjana|Total\s+Sks\s+Tahap\s+Persiapan)/s);
+            if (tahapPersiapanSection) {
+                data.tahapPersiapan = parseTahapSection(tahapPersiapanSection[1], 'Persiapan');
+            }
+            
+            const tahapSarjanaSection = text.match(/---\s*Tahap:\s*Sarjana\s*---(.*?)(?=Total\s+Sks\s+\d+|$)/s);
+            if (tahapSarjanaSection) {
+                data.tahapSarjana = parseTahapSection(tahapSarjanaSection[1], 'Sarjana');
+            }
+            
+            // Extract IP per tahap
+            const ipPersiapanMatch = text.match(/IP\s+Tahap\s+Persiapan\s*:\s*([0-9.]+)/i);
+            if (ipPersiapanMatch) {
+                data.tahapPersiapan.ip = parseFloat(ipPersiapanMatch[1]);
+            }
+            
+            const ipSarjanaMatch = text.match(/IP\s+Tahap\s+Sarjana\s*:\s*([0-9.]+)/i);
+            if (ipSarjanaMatch) {
+                data.tahapSarjana.ip = parseFloat(ipSarjanaMatch[1]);
+            }
+            
+            // Extract total SKS per tahap
+            const sksPersiapanMatch = text.match(/Total\s+Sks\s+Tahap\s+Persiapan\s*:\s*(\d+)/i);
+            if (sksPersiapanMatch) {
+                data.tahapPersiapan.totalSks = parseInt(sksPersiapanMatch[1]);
+            }
+            
+            const sksSarjanaMatch = text.match(/Total\s+Sks\s+Tahap\s+Sarjana\s*:\s*(\d+)/i);
+            if (sksSarjanaMatch) {
+                data.tahapSarjana.totalSks = parseInt(sksSarjanaMatch[1]);
+            }
+            
+            return data;
+        }
+        
+        function parseTahapSection(section, tahap) {
+            const matakuliah = [];
+            let totalSks = 0;
+            let ip = 0;
+            
+            // Regex untuk menangkap mata kuliah dengan pola yang lebih fleksibel
+            const mkRegex = /([A-Z]{2}\d{6})\s+(.+?)\s+(\d+)\s+(\d{4}\/G[sn]\/[A-Z]+)\s+([A-Z]+)/g;
+            let match;
+            
+            while ((match = mkRegex.exec(section)) !== null) {
+                const kode = match[1];
+                const nama = match[2].trim();
+                const sks = parseInt(match[3]);
+                const periode = match[4];
+                const nilai = match[5];
+                
+                // Parse periode (tahun/semester)
+                const periodeMatch = periode.match(/(\d+)\/G([sn])/);
+                const tahun = periodeMatch ? parseInt(periodeMatch[1]) : 2023;
+                const semester = periodeMatch ? periodeMatch[2] : 's';
+                
+                // Konversi nilai ke bobot
+                const bobotNilai = convertNilaiToBobot(nilai);
+                const poinKualitas = bobotNilai * sks;
+                
+                matakuliah.push({
+                    kode,
+                    nama,
+                    sks,
+                    tahun,
+                    semester,
+                    nilai,
+                    bobotNilai,
+                    poinKualitas
+                });
+                
+                totalSks += sks;
+            }
+            
+            return { matakuliah, totalSks, ip };
+        }
+        
+        function convertNilaiToBobot(nilai) {
+            const bobotMap = {
+                'A': 4.00,
+                'AB': 3.50,
+                'B': 3.00,
+                'BC': 2.50,
+                'C': 2.00,
+                'D': 1.00,
+                'E': 0.00
+            };
+            return bobotMap[nilai] || 0;
+        }
+        
+        function generateSQL(data) {
+            let sql = `-- 1. Mengisi Tabel Dimensi\n`;
+            sql += `-- DimMahasiswa (ID: 1)\n`;
+            sql += `INSERT INTO DimMahasiswa (NRP, Nama_Mahasiswa) VALUES ('${data.nrp}', '${data.nama}');\n\n`;
+            
+            sql += `-- DimTahap (ID: 1=Persiapan, 2=Sarjana)\n`;
+            sql += `INSERT INTO DimTahap (Nama_Tahap) VALUES ('Persiapan');\n`;
+            sql += `INSERT INTO DimTahap (Nama_Tahap) VALUES ('Sarjana');\n\n`;
+            
+            // Generate DimWaktu
+            const waktuSet = new Set();
+            [...data.tahapPersiapan.matakuliah, ...data.tahapSarjana.matakuliah].forEach(mk => {
+                waktuSet.add(`${mk.tahun}/${mk.semester.toUpperCase() === 'S' ? 'Gs' : 'Gn'}`);
+            });
+            
+            sql += `-- DimWaktu\n`;
+            Array.from(waktuSet).sort().forEach(waktu => {
+                const [tahun, semester] = waktu.split('/');
+                sql += `INSERT INTO DimWaktu (Tahun_Ajaran, Semester) VALUES (${tahun}, '${semester}');\n`;
+            });
+            sql += `\n`;
+            
+            // Generate DimMataKuliah
+            const allMK = [...data.tahapPersiapan.matakuliah, ...data.tahapSarjana.matakuliah];
+            sql += `-- DimMataKuliah\n`;
+            sql += `INSERT INTO DimMataKuliah (Kode_MK, Nama_MK, SKS) VALUES\n`;
+            const mkValues = allMK.map(mk => `('${mk.kode}', '${mk.nama}', ${mk.sks})`);
+            sql += mkValues.join(',\n') + ';\n\n';
+            
+            // Generate FactNilai
+            sql += `-- 2. Mengisi Tabel Fakta\n`;
+            sql += `-- FactNilai\n`;
+            sql += `INSERT INTO FactNilai (MahasiswaID, MataKuliahID, WaktuID, TahapID, Bobot_Nilai, Poin_Kualitas) VALUES\n`;
+            
+            const factNilaiValues = [];
+            let mkId = 1;
+            
+            // Tahap Persiapan
+            data.tahapPersiapan.matakuliah.forEach(mk => {
+                const waktuId = getWaktuId(mk.tahun, mk.semester, Array.from(waktuSet));
+                factNilaiValues.push(`(1, ${mkId}, ${waktuId}, 1, ${mk.bobotNilai}, ${mk.poinKualitas.toFixed(2)}) -- ${mk.nama}, ${mk.nilai}`);
+                mkId++;
+            });
+            
+            // Tahap Sarjana
+            data.tahapSarjana.matakuliah.forEach(mk => {
+                const waktuId = getWaktuId(mk.tahun, mk.semester, Array.from(waktuSet));
+                factNilaiValues.push(`(1, ${mkId}, ${waktuId}, 2, ${mk.bobotNilai}, ${mk.poinKualitas.toFixed(2)}) -- ${mk.nama}, ${mk.nilai}`);
+                mkId++;
+            });
+            
+            sql += factNilaiValues.join(',\n') + ';\n\n';
+            
+            // Generate FactIPTahap
+            sql += `-- FactIPTahap\n`;
+            sql += `INSERT INTO FactIPTahap (MahasiswaID, TahapID, IP_Tahap, Total_SKS_Tahap) VALUES\n`;
+            sql += `(1, 1, ${data.tahapPersiapan.ip}, ${data.tahapPersiapan.totalSks}),\n`;
+            sql += `(1, 2, ${data.tahapSarjana.ip}, ${data.tahapSarjana.totalSks});\n\n`;
+            
+            // Generate FactIPKumulatif
+            sql += `-- FactIPKumulatif\n`;
+            sql += `INSERT INTO FactIPKumulatif (MahasiswaID, IPK_Final, Total_SKS_Lulus, Total_SKS_Tempuh) VALUES\n`;
+            sql += `(1, ${data.ipk}, ${data.sksLulus}, ${data.sksTotal});\n`;
+            
+            document.getElementById('sqlOutput').textContent = sql;
+        }
+        
+        function getWaktuId(tahun, semester, waktuArray) {
+            const waktuStr = `${tahun}/${semester.toUpperCase() === 'S' ? 'Gs' : 'Gn'}`;
+            return waktuArray.sort().indexOf(waktuStr) + 1;
+        }
+        
+        function showResults() {
+            // Update info cards
+            const infoGrid = document.getElementById('infoGrid');
+            infoGrid.innerHTML = `
+                <div class="info-card">
+                    <h3>NRP</h3>
+                    <p>${extractedData.nrp}</p>
+                </div>
+                <div class="info-card">
+                    <h3>Nama</h3>
+                    <p>${extractedData.nama}</p>
+                </div>
+                <div class="info-card">
+                    <h3>IPK</h3>
+                    <p>${extractedData.ipk}</p>
+                </div>
+                <div class="info-card">
+                    <h3>SKS Lulus</h3>
+                    <p>${extractedData.sksLulus}</p>
+                </div>
+                <div class="info-card">
+                    <h3>Total MK</h3>
+                    <p>${extractedData.tahapPersiapan.matakuliah.length + extractedData.tahapSarjana.matakuliah.length}</p>
+                </div>
+                <div class="info-card">
+                    <h3>IP Persiapan</h3>
+                    <p>${extractedData.tahapPersiapan.ip}</p>
+                </div>
+            `;
+            
+            // Update preview
+            const preview = document.getElementById('dataPreview');
+            preview.innerHTML = `
+                <div class="code-block">
+                    <strong>Data Mahasiswa:</strong><br>
+                    NRP: ${extractedData.nrp}<br>
+                    Nama: ${extractedData.nama}<br>
+                    IPK: ${extractedData.ipk}<br><br>
+                    
+                    <strong>Tahap Persiapan (${extractedData.tahapPersiapan.matakuliah.length} MK):</strong><br>
+                    ${extractedData.tahapPersiapan.matakuliah.map(mk => 
+                        `${mk.kode} - ${mk.nama} (${mk.sks} SKS) - ${mk.nilai}`
+                    ).join('<br>')}<br><br>
+                    
+                    <strong>Tahap Sarjana (${extractedData.tahapSarjana.matakuliah.length} MK):</strong><br>
+                    ${extractedData.tahapSarjana.matakuliah.map(mk => 
+                        `${mk.kode} - ${mk.nama} (${mk.sks} SKS) - ${mk.nilai}`
+                    ).join('<br>')}
+                </div>
+            `;
+            
+            document.getElementById('results').style.display = 'block';
+        }
+        
+        function copySQLToClipboard() {
+            const sqlText = document.getElementById('sqlOutput').textContent;
+            navigator.clipboard.writeText(sqlText).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
