@@ -514,13 +514,11 @@
         }
         
         function generateSQL(data) {
-            let sql = `-- 1. Mengisi Tabel Dimensi\n`;
-            sql += `-- DimMahasiswa (ID: 1)\n`;
-            sql += `INSERT INTO DimMahasiswa (NRP, Nama_Mahasiswa) VALUES ('${data.nrp}', '${data.nama}');\n\n`;
+            let sql = '';
             
-            sql += `-- DimTahap (ID: 1=Persiapan, 2=Sarjana)\n`;
+            sql += `INSERT INTO DimMahasiswa (NRP, Nama_Mahasiswa) VALUES ('${data.nrp}', '${data.nama}');\n`;
             sql += `INSERT INTO DimTahap (Nama_Tahap) VALUES ('Persiapan');\n`;
-            sql += `INSERT INTO DimTahap (Nama_Tahap) VALUES ('Sarjana');\n\n`;
+            sql += `INSERT INTO DimTahap (Nama_Tahap) VALUES ('Sarjana');\n`;
             
             // Generate DimWaktu
             const waktuSet = new Set();
@@ -528,23 +526,18 @@
                 waktuSet.add(`${mk.tahun}/${mk.semester.toUpperCase() === 'S' ? 'Gs' : 'Gn'}`);
             });
             
-            sql += `-- DimWaktu\n`;
             Array.from(waktuSet).sort().forEach(waktu => {
                 const [tahun, semester] = waktu.split('/');
                 sql += `INSERT INTO DimWaktu (Tahun_Ajaran, Semester) VALUES (${tahun}, '${semester}');\n`;
             });
-            sql += `\n`;
             
             // Generate DimMataKuliah
             const allMK = [...data.tahapPersiapan.matakuliah, ...data.tahapSarjana.matakuliah];
-            sql += `-- DimMataKuliah\n`;
             sql += `INSERT INTO DimMataKuliah (Kode_MK, Nama_MK, SKS) VALUES\n`;
             const mkValues = allMK.map(mk => `('${mk.kode}', '${mk.nama}', ${mk.sks})`);
-            sql += mkValues.join(',\n') + ';\n\n';
+            sql += mkValues.join(',\n') + ';\n';
             
             // Generate FactNilai
-            sql += `-- 2. Mengisi Tabel Fakta\n`;
-            sql += `-- FactNilai\n`;
             sql += `INSERT INTO FactNilai (MahasiswaID, MataKuliahID, WaktuID, TahapID, Bobot_Nilai, Poin_Kualitas) VALUES\n`;
             
             const factNilaiValues = [];
@@ -553,27 +546,25 @@
             // Tahap Persiapan
             data.tahapPersiapan.matakuliah.forEach(mk => {
                 const waktuId = getWaktuId(mk.tahun, mk.semester, Array.from(waktuSet));
-                factNilaiValues.push(`(1, ${mkId}, ${waktuId}, 1, ${mk.bobotNilai}, ${mk.poinKualitas.toFixed(2)}) -- ${mk.nama}, ${mk.nilai}`);
+                factNilaiValues.push(`(1, ${mkId}, ${waktuId}, 1, ${mk.bobotNilai}, ${mk.poinKualitas.toFixed(2)})`);
                 mkId++;
             });
             
             // Tahap Sarjana
             data.tahapSarjana.matakuliah.forEach(mk => {
                 const waktuId = getWaktuId(mk.tahun, mk.semester, Array.from(waktuSet));
-                factNilaiValues.push(`(1, ${mkId}, ${waktuId}, 2, ${mk.bobotNilai}, ${mk.poinKualitas.toFixed(2)}) -- ${mk.nama}, ${mk.nilai}`);
+                factNilaiValues.push(`(1, ${mkId}, ${waktuId}, 2, ${mk.bobotNilai}, ${mk.poinKualitas.toFixed(2)})`);
                 mkId++;
             });
             
-            sql += factNilaiValues.join(',\n') + ';\n\n';
+            sql += factNilaiValues.join(',\n') + ';\n';
             
             // Generate FactIPTahap
-            sql += `-- FactIPTahap\n`;
             sql += `INSERT INTO FactIPTahap (MahasiswaID, TahapID, IP_Tahap, Total_SKS_Tahap) VALUES\n`;
             sql += `(1, 1, ${data.tahapPersiapan.ip}, ${data.tahapPersiapan.totalSks}),\n`;
-            sql += `(1, 2, ${data.tahapSarjana.ip}, ${data.tahapSarjana.totalSks});\n\n`;
+            sql += `(1, 2, ${data.tahapSarjana.ip}, ${data.tahapSarjana.totalSks});\n`;
             
             // Generate FactIPKumulatif
-            sql += `-- FactIPKumulatif\n`;
             sql += `INSERT INTO FactIPKumulatif (MahasiswaID, IPK_Final, Total_SKS_Lulus, Total_SKS_Tempuh) VALUES\n`;
             sql += `(1, ${data.ipk}, ${data.sksLulus}, ${data.sksTotal});\n`;
             
